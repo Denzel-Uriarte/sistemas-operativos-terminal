@@ -1,0 +1,9 @@
+# pipeline.jdl — pipeline secuencial de tres etapas
+#
+#   list_files -> count_lines -> report
+#
+node list_files ls -la /tmp
+node count_lines echo counting_lines
+node report echo pipeline_complete
+edge list_files count_lines
+edge count_lines report

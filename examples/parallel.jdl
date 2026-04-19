@@ -1,0 +1,11 @@
+# parallel.jdl — dos tareas independientes que alimentan un paso final
+#
+#   fetch_a ──┐
+#              ├──> merge
+#   fetch_b ──┘
+#
+node fetch_a echo data_from_A
+node fetch_b echo data_from_B
+node merge echo all_done
+edge fetch_a merge
+edge fetch_b merge

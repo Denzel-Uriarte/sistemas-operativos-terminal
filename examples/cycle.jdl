@@ -1,0 +1,7 @@
+# cycle.jdl — ciclo intencional (debe ser rechazado por SCC)
+node A echo paso_a
+node B echo paso_b
+node C echo paso_c
+edge A B
+edge B C
+edge C A

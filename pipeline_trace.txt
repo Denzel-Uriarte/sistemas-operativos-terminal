@@ -1,0 +1,218 @@
+================================================================================
+  TRAZA DEL PIPELINE: submit examples/parallel.jdl
+  Como lo ve la maquina, funcion por funcion, en orden lineal.
+================================================================================
+
+JDL de entrada (examples/parallel.jdl):
+  node fetch_a echo data_from_A
+  node fetch_b echo data_from_B
+  node merge echo all_done
+  edge fetch_a merge
+  edge fetch_b merge
+
+================================================================================
+
+ 1. main()                                          main.c:84
+    Lee "submit examples/parallel.jdl" desde stdin con fgets().
+
+ 2. parse_args()                                    terminal.c:7
+    Divide la linea en: argv[0]="submit", argv[1]="examples/parallel.jdl".
+
+ 3. strcmp(argv[0], "submit")                        main.c:104
+    Reconoce "submit" como comando built-in.
+
+ 4. control_submit("examples/parallel.jdl")          main.c:106
+    Entra al orquestador del pipeline.
+
+ 5. fopen("examples/parallel.jdl", "r")              main.c:33
+    Abre el archivo JDL. Retorna un FILE* para leerlo.
+
+────────────────── PASO 1: generateGraph ──────────────────
+
+ 6. generate_graph(&g, f)                            graph.c:108
+    Comienza a parsear el JDL linea por linea.
+
+ 7. graph_init(&g)                                   graph.c:41
+    Inicializa el struct graph a ceros con memset.
+
+ 8. fgets() lee "node fetch_a echo data_from_A"      graph.c:113
+    Primera linea del JDL.
+
+ 9. graph_add_node(g, "fetch_a", "echo data_from_A") graph.c:66
+    Crea nodo id=0, nombre="fetch_a", cmd="echo data_from_A".
+
+10. node_init(&nodes[0], 0, "fetch_a", ...)          graph.c:18
+    Inicializa el nodo: status=PENDING, scc_id=-1, pid=-1.
+
+11. fgets() lee "node fetch_b echo data_from_B"      graph.c:113
+    Segunda linea.
+
+12. graph_add_node(g, "fetch_b", "echo data_from_B") graph.c:66
+    Crea nodo id=1.
+
+13. node_init(&nodes[1], 1, "fetch_b", ...)          graph.c:18
+
+14. fgets() lee "node merge echo all_done"            graph.c:113
+
+15. graph_add_node(g, "merge", "echo all_done")      graph.c:66
+    Crea nodo id=2.
+
+16. node_init(&nodes[2], 2, "merge", ...)             graph.c:18
+
+17. fgets() lee "edge fetch_a merge"                  graph.c:113
+
+18. graph_add_edge(g, "fetch_a", "merge")             graph.c:83
+    Registra: fetch_a.edges=[2], merge.deps=[0].
+
+19. int_push() x2                                     graph.c:8
+    Agrega 2 al arreglo edges de fetch_a (arista saliente).
+    Agrega 0 al arreglo deps de merge (dependencia entrante).
+
+20. fgets() lee "edge fetch_b merge"                  graph.c:113
+
+21. graph_add_edge(g, "fetch_b", "merge")             graph.c:83
+    Registra: fetch_b.edges=[2], merge.deps=[0,1].
+
+22. int_push() x2                                     graph.c:8
+
+23. fgets() retorna NULL (fin del archivo)            graph.c:113
+    Sale del while. g.count=3, retorna 0 (exito).
+
+    Estado del grafo en memoria:
+      fetch_a (id=0): cmd="echo data_from_A", edges=[merge], deps=[]
+      fetch_b (id=1): cmd="echo data_from_B", edges=[merge], deps=[]
+      merge   (id=2): cmd="echo all_done",    edges=[],      deps=[fetch_a, fetch_b]
+
+────────────────── PASO 2: SCC (Tarjan) ──────────────────
+
+24. scc_tag(&g)                                      graph.c:234
+    Crea la pila de Tarjan con malloc.
+
+25. tj_visit(ctx, 0)  [nodo fetch_a]                 graph.c:185
+    fetch_a: tj_index=0, tj_lowlink=0, on_stack=1.
+
+26. tj_visit(ctx, 2)  [nodo merge, sucesor de fetch_a] graph.c:200
+    merge: tj_index=1, tj_lowlink=1, on_stack=1.
+
+27. merge no tiene sucesores, lowlink==index          graph.c:211
+    merge es raiz de SCC 0 (tamaño 1, sin ciclo). scc_id=0.
+
+28. Regresa a fetch_a, lowlink==index                 graph.c:211
+    fetch_a es raiz de SCC 1 (tamaño 1, sin ciclo). scc_id=1.
+
+29. tj_visit(ctx, 1)  [nodo fetch_b]                 graph.c:185
+    fetch_b: tj_index=2, tj_lowlink=2, on_stack=1.
+    Sucesor merge ya fue visitado y no esta en pila → no cambia lowlink.
+
+30. fetch_b es raiz de SCC 2 (tamaño 1, sin ciclo).  graph.c:211
+    scc_id=2.
+
+31. scc_tag retorna 0                                graph.c:253
+    Ningun SCC tiene mas de 1 nodo → no hay ciclos → DAG valido.
+
+────────────────── PASO 3: mapGraph ──────────────────
+
+32. map_graph(&g)                                    graph.c:259
+    Recorre los 3 nodos, asigna target=0 (ejecucion local) a cada uno.
+
+33. graph_print(&g)                                  graph.c:268
+    Imprime el grafo a stderr para que el usuario lo vea.
+
+────────────────── PASO 4: dispatch ──────────────────
+
+34. dispatch(&g)                                     dispatch.c:123
+    Calcula rem[]: rem[fetch_a]=0, rem[fetch_b]=0, rem[merge]=2.
+
+--- VUELTA 1 DEL WHILE ---
+
+35. rem[0]==0 → exec_node(fetch_a)                   dispatch.c:140
+
+36.   parse_args("echo data_from_A")                 terminal.c:7
+      argv[0]="echo", argv[1]="data_from_A".
+
+37.   resolve_path("echo")                           terminal.c:29
+      Recorre PATH en memoria, encuentra /usr/bin/echo.
+
+38.   fork()                                         dispatch.c:37
+      El kernel crea un proceso hijo (copia del padre).
+
+39.   HIJO: dup2(/dev/null, STDIN_FILENO)            dispatch.c:49
+      Redirige stdin del hijo a /dev/null.
+
+40.   HIJO: execve("/usr/bin/echo", argv, environ)   dispatch.c:52
+      El hijo se convierte en /usr/bin/echo. Imprime "data_from_A".
+
+41.   PADRE: n->pid = PID_hijo, status = RUNNING     dispatch.c:57
+      running = 1.
+
+42. rem[1]==0 → exec_node(fetch_b)                   dispatch.c:140
+
+43.   fork() + execve("/usr/bin/echo")                dispatch.c:37,52
+      Otro hijo. Imprime "data_from_B". running = 2.
+
+44. rem[2]==2 → merge NO se lanza (tiene dependencias pendientes).
+
+45. waitpid(-1, &wstatus, 0)                         dispatch.c:154
+    Se bloquea hasta que CUALQUIER hijo termine.
+    Supongamos que fetch_b (pid=20950) termina primero.
+
+46. handle_exit(g, 20950, wstatus, ...)               dispatch.c:160
+
+47.   find_by_pid(g, 20950)                          dispatch.c:64
+      Encuentra nodo fetch_b.
+
+48.   WIFEXITED=true, WEXITSTATUS=0 → ok=true        dispatch.c:99
+      running-- (2→1), completed++ (0→1).
+
+49.   fetch_b.status = STATUS_DONE                    dispatch.c:104
+
+50.   rem[merge]-- → rem[2] = 2-1 = 1                dispatch.c:109
+
+51. waitpid(-1, &wstatus, WNOHANG)                   dispatch.c:163
+    fetch_a tambien ya termino → lo recoge sin esperar.
+
+52. handle_exit(g, 20949, wstatus, ...)               dispatch.c:164
+
+53.   fetch_a.status = STATUS_DONE                    dispatch.c:104
+      running-- (1→0), completed++ (1→2).
+
+54.   rem[merge]-- → rem[2] = 1-1 = 0                dispatch.c:109
+
+--- VUELTA 2 DEL WHILE ---
+
+55. rem[2]==0 → exec_node(merge)                     dispatch.c:140
+
+56.   fork() + execve("/usr/bin/echo")                dispatch.c:37,52
+      Hijo imprime "all_done". running = 1.
+
+57. waitpid(-1, &wstatus, 0)                         dispatch.c:154
+    merge termina.
+
+58. handle_exit → merge.status = STATUS_DONE          dispatch.c:104
+    running-- (1→0), completed++ (2→3).
+
+--- VUELTA 3 DEL WHILE ---
+
+59. completed (3) == total (3) → sale del while       dispatch.c:135
+
+60. free(rem)                                        dispatch.c:167
+
+61. Cuenta fallidos: 0                                dispatch.c:171
+    Imprime "los 3 nodo(s) se completaron exitosamente".
+    Retorna 0.
+
+────────────────── LIMPIEZA ──────────────────
+
+62. graph_free(&g)                                   main.c:68
+    Libera edges y deps de cada nodo (node_free x3).  graph.c:33
+    Libera el arreglo de nodos.                       graph.c:50
+    Limpia el struct con memset.                      graph.c:51
+
+63. control_submit retorna 0 → main.c:106
+
+64. main() regresa al ciclo del shell → main.c:80
+    Imprime "> " y espera el siguiente comando.
+
+================================================================================
+  FIN DE LA TRAZA
+================================================================================
