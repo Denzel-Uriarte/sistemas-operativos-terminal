@@ -1,0 +1,23 @@
+Un proceso es una instancia de un programa en ejecucion. El sistema operativo
+asigna a cada proceso un identificador unico llamado PID, y mantiene para el
+una estructura de control en el kernel que guarda su estado, sus registros,
+su espacio de memoria virtual y sus descriptores de archivo.
+
+La llamada al sistema fork crea un nuevo proceso duplicando al proceso padre.
+Tras la llamada, padre e hijo continuan ejecutando el mismo codigo pero con
+espacios de memoria separados gracias a copy-on-write. El valor de retorno de
+fork distingue a ambos procesos: en el padre devuelve el PID del hijo y en el
+hijo devuelve cero. Si ocurre un error, fork devuelve menos uno y no se crea
+ningun proceso.
+
+La llamada execve reemplaza la imagen de memoria del proceso actual con un
+programa distinto, conservando el PID pero cargando un nuevo codigo, nuevos
+datos y una nueva pila. Esta separacion entre fork y execve es una de las
+decisiones de diseno mas elegantes de Unix, porque permite que el padre
+configure el entorno del hijo antes de que el hijo ejecute el programa nuevo.
+
+El padre debe recoger el estado de salida del hijo usando waitpid para evitar
+procesos zombis. Un proceso zombi es un proceso que ya termino pero cuyo
+registro en la tabla de procesos aun no ha sido liberado porque el padre no
+ha llamado a wait. Si el padre muere antes que el hijo, el hijo es adoptado
+por el proceso init, que se encarga de limpiar su estado al terminar.

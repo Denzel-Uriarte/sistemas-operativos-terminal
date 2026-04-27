@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════════════════
+# wk.jdl — Pipeline de procesamiento de texto
+#
+# Flujo del DAG:
+#
+#     arch1.txt ──> sort1 ──┐
+#     arch2.txt ──> sort2 ──┼──> concat ──> wcloud ──> wcloud.jpg
+#     arch3.txt ──> sort3 ──┘
+#
+# Fase 1 (paralelo): 3 nodos sort independientes. Cada uno lee su archivo,
+#   tokeniza, pasa a minusculas y ordena lexicograficamente.
+# Fase 2 (barrera): concat espera a que las 3 fases anteriores terminen
+#   y une los 3 archivos ordenados en uno solo.
+# Fase 3 (final): wcloud lee el archivo concatenado, cuenta frecuencias,
+#   filtra stopwords y genera una nube de palabras en JPG.
+#
+# NOTA sobre las rutas:
+#   Todas las rutas son RELATIVAS al directorio desde donde se lanza el
+#   shell (no relativas al JDL). Si tu shell ejecuta desde la raiz del
+#   proyecto, usa `workflow/arch1.txt`. Si entras a workflow/ y ejecutas
+#   desde ahi, usa `./arch1.txt`.
+#
+#   Los comandos de los nodos usan `./workflow/script.sh` porque
+#   resolve_path() del shell busca en PATH cuando no ve `/` y fallaria con
+#   solo `script.sh`.
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── Fase 1: ordenar cada archivo en paralelo ──────────────────────────
+node sort1 ./workflow/sort_file.sh workflow/arch1.txt workflow/sorted1.txt
+node sort2 ./workflow/sort_file.sh workflow/arch2.txt workflow/sorted2.txt
+node sort3 ./workflow/sort_file.sh workflow/arch3.txt workflow/sorted3.txt
+
+# ── Fase 2: concatenar los 3 archivos ordenados ───────────────────────
+node concat ./workflow/concatenar.sh workflow/concatenated.txt workflow/sorted1.txt workflow/sorted2.txt workflow/sorted3.txt
+
+# ── Fase 3: generar el word cloud como JPG ────────────────────────────
+node wcloud ./workflow/wordcloud_gen.py workflow/concatenated.txt workflow/wcloud.jpg
+
+# ── Aristas: definen el orden topologico del DAG ──────────────────────
+edge sort1 concat
+edge sort2 concat
+edge sort3 concat
+edge concat wcloud

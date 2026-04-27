@@ -1,0 +1,25 @@
+La memoria virtual es una abstraccion que permite a cada proceso tener la
+ilusion de poseer todo el espacio de direcciones para si mismo. El kernel y
+la unidad de manejo de memoria traducen direcciones virtuales a direcciones
+fisicas mediante tablas de paginas. Esta traduccion ocurre en hardware y es
+acelerada por una cache llamada TLB que guarda traducciones recientes.
+
+La paginacion divide la memoria en bloques de tamano fijo llamados paginas.
+Cuando un proceso accede a una pagina que no esta presente en memoria fisica,
+el hardware genera una interrupcion conocida como page fault. El kernel
+atiende la interrupcion trayendo la pagina desde disco o asignando una nueva
+pagina fisica si el acceso es legitimo. Si el acceso es ilegitimo, el kernel
+termina el proceso con una senal de segmentacion.
+
+El mecanismo copy-on-write permite que fork sea eficiente. Cuando un proceso
+se duplica, el kernel no copia inmediatamente toda la memoria del padre, sino
+que marca las paginas compartidas como de solo lectura. Cuando el padre o el
+hijo intentan escribir, el hardware dispara un fallo de proteccion y el
+kernel duplica la pagina en ese momento. Asi se evita copiar memoria que
+nunca sera modificada.
+
+El swap es el mecanismo que permite mover paginas de memoria fisica al disco
+cuando la memoria escasea. Las paginas menos usadas son las primeras en ser
+evacuadas siguiendo politicas como least recently used. Cuando un proceso
+necesita acceder a una pagina que fue movida al swap, el kernel la trae de
+vuelta y posiblemente evacua otra pagina para hacer espacio.

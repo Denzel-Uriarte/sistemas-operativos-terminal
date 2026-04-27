@@ -1,0 +1,29 @@
+El planificador del sistema operativo decide que proceso se ejecuta en cada
+nucleo del procesador en cada instante. En un sistema multitarea apropiativa,
+el kernel puede interrumpir un proceso en cualquier momento y dar el control
+a otro proceso. Este cambio de contexto implica guardar el estado del
+proceso saliente y restaurar el estado del proceso entrante, lo cual tiene
+un costo medible en ciclos de cpu.
+
+Las politicas de planificacion buscan equilibrar varios objetivos a menudo
+contradictorios: maximizar el uso del procesador, minimizar el tiempo de
+respuesta, garantizar la equidad entre procesos y evitar la inanicion. El
+planificador de Linux usa una estructura de datos llamada red black tree
+para mantener los procesos ordenados por tiempo virtual de ejecucion, de
+modo que siempre se elige el proceso que menos se ha ejecutado.
+
+La concurrencia introduce problemas clasicos como las condiciones de
+carrera, los bloqueos mutuos y la inversion de prioridades. Una condicion
+de carrera ocurre cuando el resultado de una ejecucion depende del orden
+relativo en que se intercalen las operaciones de varios hilos. Los mutex y
+semaforos son primitivas que permiten serializar el acceso a recursos
+compartidos, pero usarlos mal puede causar bloqueos mutuos donde dos
+procesos se esperan mutuamente para siempre.
+
+La comunicacion entre procesos se realiza mediante mecanismos como pipes,
+colas de mensajes, memoria compartida y sockets. Los pipes son la forma mas
+tradicional de conectar la salida de un proceso con la entrada de otro en
+la linea de comandos del shell. La memoria compartida es la forma mas
+rapida de comunicacion porque evita copiar datos, pero requiere
+sincronizacion explicita. Los sockets permiten comunicacion entre procesos
+en maquinas distintas a traves de la red usando protocolos como tcp y udp.
